@@ -1,0 +1,13 @@
+/dist/
+/build/
+/whisperenv/
+/__pycache__/
+/*.exe
+/*.pkg
+*.dll
+*.pyd
+*.bin
+*.ckpt
+*.mp4
+*.wav
+*.mp3
