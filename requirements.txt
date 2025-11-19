@@ -1,17 +1,5 @@
-# Streamlit - Framework web
-streamlit>=1.31.0
-
-# OpenAI Whisper - Transcrição de áudio
-openai-whisper
-
-# Dependências do Whisper (versões compatíveis com Streamlit Cloud)
-torch
-torchaudio
-numpy
-ffmpeg-python
-
-# Processamento de áudio
-soundfile
-
-# Utilidades
-python-multipart
+streamlit==1.38.0
+whisper==1.1.10
+torch==2.3.1+cpu
+torchaudio==2.3.1+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
