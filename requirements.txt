@@ -1,5 +1,6 @@
 streamlit
-openai-whisper
+openai-whisper==20231117
 torch
 torchaudio
 ffmpeg-python
+pydub

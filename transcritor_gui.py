@@ -2,7 +2,7 @@ import streamlit as st
 import whisper
 import tempfile
 import os
-import sys
+from pathlib import Path
 
 # Configuração da página
 st.set_page_config(page_title="Transcritor Whisper", layout="centered")
@@ -26,13 +26,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Adiciona ffmpeg ao PATH se não estiver
+ffmpeg_path = "/usr/bin"
+if ffmpeg_path not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = f"{ffmpeg_path}:{os.environ.get('PATH', '')}"
+
 # Upload de arquivo
 arquivo = st.file_uploader(
-    "Envie um arquivo de áudio ou vídeo",
-    type=["mp3", "wav", "mp4", "m4a", "mov"]
+    "Envie um arquivo de áudio ou vídeo (melhor com MP3 ou WAV)",
+    type=["mp3", "wav", "mp4", "m4a", "mov", "mpeg"]
 )
 
-# Carregar modelo só uma vez (usando modelo tiny para economizar memória)
+# Carregar modelo só uma vez
 @st.cache_resource
 def carregar_modelo():
     return whisper.load_model("tiny")
@@ -44,24 +49,43 @@ if 'texto_final' not in st.session_state:
     st.session_state.texto_final = ""
 
 if arquivo is not None:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(arquivo.name)[1]) as tmp:
+    # Salvar arquivo temporário com extensão correta
+    suffix = Path(arquivo.name).suffix
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(arquivo.read())
         caminho_temp = tmp.name
 
     st.info("Transcrevendo... Aguarde ⏳")
-
+    
+    progress_bar = st.progress(0)
+    
     try:
-        # Transcrever com configurações otimizadas
+        # Configurar whisper para não usar fp16 (incompatível com CPU)
+        progress_bar.progress(30)
+        
         resultado = modelo.transcribe(
-            caminho_temp, 
+            caminho_temp,
+            language="pt",
             fp16=False,
-            language="pt"  # Força português para melhor precisão
+            verbose=False
         )
+        
+        progress_bar.progress(100)
         st.session_state.texto_final = resultado["text"]
         st.success("✅ Transcrição concluída!")
+        
+    except FileNotFoundError as e:
+        st.error("❌ FFmpeg não encontrado. Tentando método alternativo...")
+        st.info("💡 Por favor, tente enviar apenas arquivos MP3 ou WAV")
+        st.code(str(e), language="text")
+        
     except Exception as e:
-        st.error(f"Erro ao transcrever: {str(e)}")
-        st.info("💡 Tente converter o arquivo para MP3 antes de enviar")
+        st.error(f"❌ Erro ao transcrever: {str(e)}")
+        st.info("💡 Sugestões:")
+        st.write("- Tente converter o arquivo para MP3")
+        st.write("- Certifique-se de que o arquivo não está corrompido")
+        st.write("- Tente com um arquivo menor (< 25MB)")
+        
     finally:
         # Limpar arquivo temporário
         try:
@@ -69,16 +93,28 @@ if arquivo is not None:
                 os.unlink(caminho_temp)
         except:
             pass
+        
+        # Remover barra de progresso
+        progress_bar.empty()
 
 # Mostrar texto transcrito
 if st.session_state.texto_final:
-    st.text_area("Resultado", st.session_state.texto_final, height=350)
+    st.text_area("Resultado", st.session_state.texto_final, height=350, key="resultado")
 
-    st.info("💡 Selecione o texto acima e copie com Ctrl+C (ou Cmd+C no Mac)")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.info("💡 Selecione o texto e copie (Ctrl+C)")
 
-    st.download_button(
-        label="💾 Baixar .txt",
-        data=st.session_state.texto_final,
-        file_name="transcricao.txt",
-        mime="text/plain"
-    )
+    with col2:
+        st.download_button(
+            label="💾 Baixar .txt",
+            data=st.session_state.texto_final,
+            file_name="transcricao.txt",
+            mime="text/plain"
+        )
+    
+    # Botão para limpar
+    if st.button("🗑️ Nova transcrição"):
+        st.session_state.texto_final = ""
+        st.rerun()
