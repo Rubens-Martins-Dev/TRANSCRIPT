@@ -2,6 +2,7 @@ import streamlit as st
 import whisper
 import tempfile
 import os
+import sys
 
 # Configuração da página
 st.set_page_config(page_title="Transcritor Whisper", layout="centered")
@@ -34,7 +35,7 @@ arquivo = st.file_uploader(
 # Carregar modelo só uma vez (usando modelo tiny para economizar memória)
 @st.cache_resource
 def carregar_modelo():
-    return whisper.load_model("tiny")  # Mudado para "tiny" - mais leve
+    return whisper.load_model("tiny")
 
 modelo = carregar_modelo()
 
@@ -50,30 +51,34 @@ if arquivo is not None:
     st.info("Transcrevendo... Aguarde ⏳")
 
     try:
-        resultado = modelo.transcribe(caminho_temp, fp16=False)
+        # Transcrever com configurações otimizadas
+        resultado = modelo.transcribe(
+            caminho_temp, 
+            fp16=False,
+            language="pt"  # Força português para melhor precisão
+        )
         st.session_state.texto_final = resultado["text"]
         st.success("✅ Transcrição concluída!")
     except Exception as e:
         st.error(f"Erro ao transcrever: {str(e)}")
+        st.info("💡 Tente converter o arquivo para MP3 antes de enviar")
     finally:
         # Limpar arquivo temporário
-        if os.path.exists(caminho_temp):
-            os.unlink(caminho_temp)
+        try:
+            if os.path.exists(caminho_temp):
+                os.unlink(caminho_temp)
+        except:
+            pass
 
 # Mostrar texto transcrito
 if st.session_state.texto_final:
     st.text_area("Resultado", st.session_state.texto_final, height=350)
 
-    col1, col2 = st.columns(2)
+    st.info("💡 Selecione o texto acima e copie com Ctrl+C (ou Cmd+C no Mac)")
 
-    with col1:
-        # Botão visual apenas - o usuário precisa copiar manualmente
-        st.info("💡 Selecione o texto acima e copie com Ctrl+C")
-
-    with col2:
-        st.download_button(
-            label="💾 Baixar .txt",
-            data=st.session_state.texto_final,
-            file_name="transcricao.txt",
-            mime="text/plain"
-        )
+    st.download_button(
+        label="💾 Baixar .txt",
+        data=st.session_state.texto_final,
+        file_name="transcricao.txt",
+        mime="text/plain"
+    )
